@@ -39,20 +39,25 @@
   function renderSettings(settings, doc = (typeof document !== 'undefined' ? document : null)) {
     if (!doc) return;
 
-    cachedSettings = { ...DEFAULT_SETTINGS, ...settings };
+    cachedSettings = { ...DEFAULT_SETTINGS, ...cachedSettings, ...settings };
+
+    const isMasterEnabled = Boolean(cachedSettings.extensionEnabled);
 
     // Update checkbox toggles
     for (const key of TOGGLE_KEYS) {
       const inputEl = doc.getElementById(key);
       if (inputEl && typeof inputEl === 'object') {
         inputEl.checked = Boolean(cachedSettings[key]);
+        if (key !== 'extensionEnabled') {
+          inputEl.disabled = !isMasterEnabled;
+        }
       }
     }
 
     // Update Master Switch visual lock on sub-controls
     const contentEl = doc.getElementById('settingsContent');
     if (contentEl) {
-      if (!cachedSettings.extensionEnabled) {
+      if (!isMasterEnabled) {
         if (contentEl.classList && typeof contentEl.classList.add === 'function') {
           contentEl.classList.add('disabled');
         } else if (contentEl.className) {
@@ -77,6 +82,8 @@
       const btn = segmentButtons[i];
       const milestone = btn.getAttribute ? btn.getAttribute('data-milestone') : null;
       const isSelected = milestone === activeMilestone;
+
+      btn.disabled = !isMasterEnabled;
 
       if (btn.classList && typeof btn.classList.toggle === 'function') {
         btn.classList.toggle('active', isSelected);
@@ -162,6 +169,10 @@
       const inputEl = doc.getElementById(key);
       if (inputEl && typeof inputEl.addEventListener === 'function') {
         inputEl.addEventListener('change', (e) => {
+          if (key !== 'extensionEnabled' && !cachedSettings.extensionEnabled) {
+            e.preventDefault();
+            return;
+          }
           const isChecked = Boolean(e.target.checked);
           saveSetting(key, isChecked, storageArea);
 
@@ -179,6 +190,7 @@
       const btn = segmentButtons[i];
       if (typeof btn.addEventListener === 'function') {
         btn.addEventListener('click', () => {
+          if (!cachedSettings.extensionEnabled) return;
           const milestone = btn.getAttribute('data-milestone');
           if (VALID_MILESTONES.includes(milestone)) {
             saveSetting('thumbnailMilestone', milestone, storageArea);

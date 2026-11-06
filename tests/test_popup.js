@@ -150,13 +150,16 @@ test('renderSettings synchronizes inputs and segmented control with state', () =
   assert.strictEqual(elements['cleanHome'].checked, false);
   assert.strictEqual(elements['settingsContent'].classList.contains('disabled'), false);
 
-  // 2. Master toggle turned OFF disables settingsContent
+  // 2. Master toggle turned OFF disables settingsContent and sub-inputs
   popup.renderSettings({
     extensionEnabled: false
   }, mockDoc);
 
   assert.strictEqual(elements['extensionEnabled'].checked, false);
   assert.strictEqual(elements['settingsContent'].classList.contains('disabled'), true);
+  assert.strictEqual(elements['cleanHome'].disabled, true);
+  // Ensure partial update preserved previously set milestone 'hq3'
+  assert.strictEqual(popup._getCachedSettings().thumbnailMilestone, 'hq3');
 });
 
 // --------------------------------------------------------------------------
