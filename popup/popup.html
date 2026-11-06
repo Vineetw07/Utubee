@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Utubee Settings</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header with Master Toggle -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="logo-icon">
+            <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1 class="title">Utubee</h1>
+          <p class="subtitle">Study Companion &amp; Focus</p>
+        </div>
+      </div>
+      <label class="switch" title="Master Extension Toggle">
+        <input type="checkbox" id="extensionEnabled">
+        <span class="slider"></span>
+        <span class="sr-only">Enable Extension</span>
+      </label>
+    </header>
+
+    <!-- Main Settings Body (dimmed if Master Switch is OFF) -->
+    <main id="settingsContent" class="settings-content">
+      <!-- Section: Authentic Thumbnail Milestone -->
+      <section class="section">
+        <div class="section-header">
+          <h2 class="section-title">Thumbnail Milestone</h2>
+          <span class="section-hint">Midpoint frame</span>
+        </div>
+        <div class="segmented-control" role="radiogroup" aria-label="Thumbnail Milestone Frame">
+          <button type="button" class="segment-btn" data-milestone="hq1" role="radio" aria-checked="false">
+            25% <span class="segment-sub">Start</span>
+          </button>
+          <button type="button" class="segment-btn active" data-milestone="hq2" role="radio" aria-checked="true">
+            50% <span class="segment-sub">Middle</span>
+          </button>
+          <button type="button" class="segment-btn" data-milestone="hq3" role="radio" aria-checked="false">
+            75% <span class="segment-sub">End</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Section: Study Focus Shields -->
+      <section class="section">
+        <div class="section-header">
+          <h2 class="section-title">Study Focus Shields</h2>
+        </div>
+        <div class="card-group">
+          <!-- Clean Home -->
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">Clean Slate Home</span>
+              <span class="setting-desc">Search-first homepage, hides feed</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="cleanHome">
+              <span class="slider"></span>
+              <span class="sr-only">Clean Slate Home</span>
+            </label>
+          </div>
+
+          <!-- Safe Sidebar -->
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">Playlist-Safe Sidebar</span>
+              <span class="setting-desc">Hides recommendations, keeps playlists</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="hideSidebar">
+              <span class="slider"></span>
+              <span class="sr-only">Hide Sidebar Recommendations</span>
+            </label>
+          </div>
+
+          <!-- Block Shorts -->
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">Block Shorts</span>
+              <span class="setting-desc">Removes vertical reels &amp; nav tabs</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="hideShorts">
+              <span class="slider"></span>
+              <span class="sr-only">Block Shorts</span>
+            </label>
+          </div>
+
+          <!-- Hide Comments -->
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">Shield Comments</span>
+              <span class="setting-desc">Collapsed with 1-click errata reveal</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="hideComments">
+              <span class="slider"></span>
+              <span class="sr-only">Shield Comments</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Comprehension Tools -->
+      <section class="section">
+        <div class="section-header">
+          <h2 class="section-title">Comprehension Tools</h2>
+        </div>
+        <div class="card-group">
+          <!-- Slide Capture -->
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="label-with-kbd">
+                <span class="setting-label">Slide Capture</span>
+                <span class="kbd-badge"><kbd>Alt</kbd>+<kbd>S</kbd></span>
+              </div>
+              <span class="setting-desc">Copies full-res frame to clipboard</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="slideCaptureEnabled">
+              <span class="slider"></span>
+              <span class="sr-only">Slide Capture</span>
+            </label>
+          </div>
+
+          <!-- A-B Concept Looper -->
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="label-with-kbd">
+                <span class="setting-label">A-B Concept Looper</span>
+                <span class="kbd-badge"><kbd>[</kbd> <kbd>]</kbd></span>
+              </div>
+              <span class="setting-desc">Loops micro-segment (<kbd>\</kbd> clears)</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="abLooperEnabled">
+              <span class="slider"></span>
+              <span class="sr-only">A-B Concept Looper</span>
+            </label>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span class="footer-status" id="syncStatus">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span class="status-text">Synced with YouTube</span>
+      </span>
+      <span class="version">v1.0.0</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

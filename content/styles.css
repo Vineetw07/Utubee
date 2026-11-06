@@ -1,0 +1,310 @@
+/* Utubee-Thumbnail: Scoped Styles for Authentic Video Frame Swapping */
+
+/*
+ * Letterbox Scale & Aspect-Ratio Compensation:
+ * YouTube's hq1/hq2/hq3 thumbnails are 480x360 (4:3) with baked-in letterbox bars (45px top/bottom)
+ * for standard 16:9 videos.
+ * In YouTube's 16:9 thumbnail wrappers, applying object-fit: cover mathematically crops out
+ * exactly the 12.5% top and bottom black bars, seamlessly filling the 16:9 card without distortion.
+ */
+img[data-utubee-swapped="true"] {
+  object-fit: cover !important;
+  transform: none !important;
+  transition: opacity 0.15s ease-in-out;
+  border-radius: inherit;
+}
+
+/* Ensure parent thumbnail containers maintain proper clipping */
+[data-utubee-card-active="true"] ytd-thumbnail,
+[data-utubee-card-active="true"] yt-image,
+[data-utubee-card-active="true"] #thumbnail {
+  overflow: hidden !important;
+}
+
+/* ==========================================================================
+   Utubee Study Focus Shields (Declarative CSS Rules)
+   Injected at document_start via root html[data-utubee-*="true"] attributes
+   Zero FOUC, zero layout thrashing, zero script delay
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Clean Slate Home Shield
+   Hides algorithmic recommendation feed on the homepage (search-first study)
+   -------------------------------------------------------------------------- */
+html[data-utubee-clean-home="true"] ytd-browse[page-subtype="home"] #contents,
+html[data-utubee-clean-home="true"] ytd-browse[page-subtype="home"] ytd-rich-grid-renderer {
+  display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   2. Playlist-Safe Sidebar Hider
+   Hides sidebar recommendation rabbit holes (#secondary #related)
+   INVARIANT: NEVER hide course lecture playlists (ytd-playlist-panel-renderer)
+   -------------------------------------------------------------------------- */
+html[data-utubee-hide-sidebar="true"] #secondary #related,
+html[data-utubee-hide-sidebar="true"] ytd-watch-flexy #secondary #related,
+html[data-utubee-hide-sidebar="true"] ytd-watch-grid #secondary #related {
+  display: none !important;
+}
+
+/* Explicit playlist preservation invariant */
+html[data-utubee-hide-sidebar="true"] ytd-playlist-panel-renderer,
+html[data-utubee-hide-sidebar="true"] #secondary ytd-playlist-panel-renderer,
+html[data-utubee-hide-sidebar="true"] #secondary-inner ytd-playlist-panel-renderer {
+  display: flex !important;
+  visibility: visible !important;
+}
+
+/* --------------------------------------------------------------------------
+   3. Shorts Eradication Shield
+   Completely hides Shorts from navigation guide, shelves, and search results
+   -------------------------------------------------------------------------- */
+/* Guide / Mini-Guide Navigation */
+html[data-utubee-hide-shorts="true"] ytd-guide-entry-renderer:has(a[title="Shorts"]),
+html[data-utubee-hide-shorts="true"] ytd-guide-entry-renderer:has(a[href*="/shorts"]),
+html[data-utubee-hide-shorts="true"] ytd-mini-guide-entry-renderer[aria-label="Shorts"],
+html[data-utubee-hide-shorts="true"] ytd-mini-guide-entry-renderer:has(a[title="Shorts"]),
+html[data-utubee-hide-shorts="true"] ytd-mini-guide-entry-renderer:has(a[href*="/shorts"]),
+
+/* Homepage, Subscriptions, and Browse Shelves */
+html[data-utubee-hide-shorts="true"] ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]),
+html[data-utubee-hide-shorts="true"] ytd-rich-shelf-renderer[is-shorts],
+html[data-utubee-hide-shorts="true"] ytd-reel-shelf-renderer,
+html[data-utubee-hide-shorts="true"] ytd-rich-item-renderer:has(a[href*="/shorts/"]),
+
+/* Search Results and Sidebar Shorts */
+html[data-utubee-hide-shorts="true"] ytd-video-renderer:has(a[href*="/shorts/"]),
+html[data-utubee-hide-shorts="true"] ytd-compact-video-renderer:has(a[href*="/shorts/"]),
+html[data-utubee-hide-shorts="true"] ytd-shelf-renderer:has(a[href*="/shorts/"]) {
+  display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. Comments Shield with Errata Toggle
+   Comments hidden by default unless revealed via on-screen errata button
+   -------------------------------------------------------------------------- */
+html[data-utubee-hide-comments="true"]:not([data-utubee-comments-revealed="true"]) ytd-comments#comments,
+html[data-utubee-hide-comments="true"]:not([data-utubee-comments-revealed="true"]) #comments {
+  display: none !important;
+}
+
+/* Errata Toggle Container */
+#utubee-errata-container {
+  display: none;
+  width: 100%;
+  margin: 16px 0 20px 0;
+  box-sizing: border-box;
+}
+
+html[data-utubee-hide-comments="true"] #utubee-errata-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* Modern, craft-grade Errata Button respecting YouTube / System themes */
+#utubee-comments-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  padding: 8px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--yt-spec-badge-chip-background, rgba(0, 0, 0, 0.05));
+  color: var(--yt-spec-text-primary, #0f0f0f);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 150ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 100ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#utubee-comments-toggle-btn:hover {
+  background: rgba(0, 0, 0, 0.09);
+  border-color: rgba(0, 0, 0, 0.16);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+#utubee-comments-toggle-btn:active {
+  transform: scale(0.98);
+}
+
+#utubee-comments-toggle-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--yt-spec-call-to-action, #065fd4);
+}
+
+#utubee-comments-toggle-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+/* Dark mode styling (YouTube dark theme) */
+html[dark] #utubee-comments-toggle-btn,
+[dark] #utubee-comments-toggle-btn,
+html[theme="dark"] #utubee-comments-toggle-btn {
+  background: var(--yt-spec-badge-chip-background, rgba(255, 255, 255, 0.08));
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--yt-spec-text-primary, #f1f1f1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+html[dark] #utubee-comments-toggle-btn:hover,
+[dark] #utubee-comments-toggle-btn:hover,
+html[theme="dark"] #utubee-comments-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+html[dark] #utubee-comments-toggle-btn:focus-visible,
+[dark] #utubee-comments-toggle-btn:focus-visible,
+html[theme="dark"] #utubee-comments-toggle-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--yt-spec-call-to-action, #3ea6ff);
+}
+
+/* System dark mode fallback */
+@media (prefers-color-scheme: dark) {
+  html:not([light]) #utubee-comments-toggle-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #f1f1f1;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+  html:not([light]) #utubee-comments-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* ==========================================================================
+   Utubee Comprehension Tools: Slide Capture Toast & A-B Looper Badge
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Slide Capture & Looper Toast Notification (HUD)
+   -------------------------------------------------------------------------- */
+#utubee-toast {
+  position: fixed;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-10px);
+  background: rgba(15, 15, 15, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #f1f1f1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  z-index: 9999999;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 180ms;
+}
+
+#utubee-toast.utubee-toast-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+#utubee-toast.utubee-toast-error {
+  background: rgba(180, 20, 20, 0.92);
+  border-color: rgba(255, 100, 100, 0.3);
+  color: #ffffff;
+}
+
+/* Light theme toast override */
+html:not([dark]):not([theme="dark"]) #utubee-toast:not(.utubee-toast-error) {
+  background: rgba(245, 245, 245, 0.95);
+  color: #0f0f0f;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* --------------------------------------------------------------------------
+   2. Discreet On-Player A-B Looper Badge
+   -------------------------------------------------------------------------- */
+#utubee-loop-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: rgba(15, 15, 15, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #f1f1f1;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  font-family: monospace, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  user-select: none;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.utubee-loop-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #3ea6ff;
+  box-shadow: 0 0 6px rgba(62, 166, 255, 0.8);
+  animation: utubee-pulse 2s infinite ease-in-out;
+}
+
+@keyframes utubee-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
+/* Accessibility: respect user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  #utubee-comments-toggle-btn,
+  img[data-utubee-swapped="true"],
+  #utubee-loop-badge,
+  .utubee-loop-badge-dot {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+  }
+
+  #utubee-toast {
+    transition: none !important;
+    animation: none !important;
+    transform: translateX(-50%) !important;
+  }
+}
