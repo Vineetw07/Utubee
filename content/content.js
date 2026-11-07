@@ -266,8 +266,32 @@
   function processCard(card, milestone) {
     if (!card || typeof card.querySelector !== 'function') return;
 
+    // Fast-path: If card is already active with target milestone, verify anchor still matches
+    const activeCard = card.getAttribute && card.getAttribute('data-utubee-card-active') === 'true';
+    const activeMilestone = card.getAttribute ? card.getAttribute('data-utubee-milestone') : null;
+    const activeVideoId = card.getAttribute ? card.getAttribute('data-utubee-video-id') : null;
+
+    if (activeCard && activeMilestone === milestone && activeVideoId) {
+      const anchor = card.querySelector(
+        'a.ytLockupViewModelContentImage[href], a#thumbnail[href], a#video-title-link[href], a#video-title[href], a[href*="/watch?v="]'
+      );
+      const anchorHref = anchor ? anchor.getAttribute('href') : null;
+      if (anchorHref && anchorHref.includes(activeVideoId)) {
+        const img = card.querySelector(
+          'yt-thumbnail-view-model img:not(.ytSpecAvatarShapeImage), ytd-thumbnail img, yt-image img, #thumbnail img, a[href*="/watch"] img:not(.ytSpecAvatarShapeImage)'
+        );
+        const targetUrl = getThumbnailUrl(activeVideoId, milestone);
+        if (img && img.getAttribute && img.getAttribute('data-utubee-swapped') === 'true' && img.src === targetUrl) {
+          return; // Instant O(1) fast-path exit! Eliminates DOM thrashing on scroll
+        }
+      }
+    }
+
     // Skip active live streams and upcoming premieres
     if (isLiveOrUpcoming(card)) {
+      if (typeof card.setAttribute === 'function') {
+        card.setAttribute('data-utubee-live', 'true');
+      }
       return;
     }
 
@@ -668,28 +692,67 @@
   }
 
   /**
+   * Evaluates DOM mutation records, filtering self-induced changes and triggering debounced scans.
+   * @param {MutationRecord[]} mutations
+   * @param {(() => void)|null} [scanner]
+   */
+  function handleMutationRecords(mutations, scanner = scheduleScan) {
+    if (!currentSettings.extensionEnabled || !mutations || !mutations.length) return;
+
+    let shouldScan = false;
+    for (let i = 0; i < mutations.length; i++) {
+      const m = mutations[i];
+      if (m.type === 'childList') {
+        if (m.addedNodes && m.addedNodes.length > 0) {
+          shouldScan = true;
+          break;
+        }
+      } else if (m.type === 'attributes') {
+        const target = m.target;
+        if (m.attributeName === 'href') {
+          shouldScan = true;
+          break;
+        }
+        if (m.attributeName === 'src' || m.attributeName === 'srcset') {
+          // If image is not yet swapped or its src doesn't match our target milestone URL, we must scan
+          if (!target || !target.getAttribute || target.getAttribute('data-utubee-swapped') !== 'true') {
+            shouldScan = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (shouldScan && typeof scanner === 'function') {
+      scanner();
+    }
+
+    const isWatchPage = typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/watch');
+    if (currentSettings.hideComments && isWatchPage && typeof document !== 'undefined' && !document.getElementById('utubee-errata-container')) {
+      injectCommentsToggleButton();
+    }
+    if (currentSettings.cleanHome && typeof document !== 'undefined' && !document.getElementById('utubee-clean-slate-container')) {
+      injectCleanSlateHUD();
+    }
+  }
+
+  /**
    * Initializes DOM mutation observer to dynamically handle infinite scroll.
    */
   function initObserver() {
     if (mutationObserver) return;
 
-    mutationObserver = new MutationObserver(() => {
-      if (!currentSettings.extensionEnabled) return;
-      scheduleScan();
-      const isWatchPage = typeof window !== 'undefined' && window.location && window.location.pathname.startsWith('/watch');
-      if (currentSettings.hideComments && isWatchPage && typeof document !== 'undefined' && !document.getElementById('utubee-errata-container')) {
-        injectCommentsToggleButton();
-      }
-      if (currentSettings.cleanHome && typeof document !== 'undefined' && !document.getElementById('utubee-clean-slate-container')) {
-        injectCleanSlateHUD();
-      }
+    mutationObserver = new MutationObserver((mutations) => {
+      handleMutationRecords(mutations);
     });
 
     const root = document.documentElement || document.body;
     if (root) {
       mutationObserver.observe(root, {
         childList: true,
-        subtree: true
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['src', 'srcset', 'href']
       });
     }
   }
@@ -1140,6 +1203,9 @@
       handleKeyDown(e, document);
     });
 
+    // Proactive passive scroll listener to catch newly scrolled viewport rows
+    window.addEventListener('scroll', scheduleScan, { passive: true });
+
     // Initial scan, button injection, and clean slate HUD when DOM is interactive
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => {
@@ -1172,6 +1238,7 @@
       processCard,
       scanAndSwapThumbnails,
       restoreAllThumbnails,
+      handleMutationRecords,
       applyRootAttributes,
       toggleCommentsVisibility,
       injectCommentsToggleButton,

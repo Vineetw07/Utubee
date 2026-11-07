@@ -19,6 +19,14 @@
 ---
 
 ## Done
+- [x] TASK-109: Zero-Flicker Scroll Shield, Targeted Attribute Observer, `srcset` Property Lock & O(1) Fast-Path
+  - Completed: 2026-11-07T10:26:00Z
+  - Proof: Exit code 0 | `node --check content/content.js; node --check popup/popup.js; node tests/test_thumbnail_engine.js; node tests/test_study_shields.js; node tests/test_comprehension_tools.js; node tests/test_popup.js; node tests/test_production_fixes.js; node tests/test_modern_youtube.js; node tests/test_scroll_performance.js` (63/63 unit assertions passed)
+  - Zero-Flicker CSS: Injected `html[data-utubee-enabled="true"] img[data-utubee-loading="true"] { opacity: 0 !important; }` to eliminate Flash of Original Thumbnail (FOOT).
+  - Descriptor Lock: Implemented `Object.defineProperty(img, 'srcset', ...)` to prevent YouTube's lazy-loader from overwriting authentic frames.
+  - O(1) Fast-Path: Added instant anchor verification on active cards, bypassing 500+ DOM queries per scroll tick.
+  - Targeted Observer: Augmented MutationObserver with `attributeFilter: ['src', 'srcset', 'href']` and passive scroll listener.
+  - Files: `content/content.js`, `content/styles.css`, `tests/test_scroll_performance.js`
 - [x] TASK-108: Modern YouTube Card Selectors (`yt-lockup-view-model`, `yt-thumbnail-view-model`), Trusted Types CSP Fix, & Clean Slate Study HUD
   - Completed: 2026-11-06T13:10:00Z
   - Proof: Exit code 0 | `node --check content/content.js; node --check popup/popup.js; node tests/test_thumbnail_engine.js; node tests/test_study_shields.js; node tests/test_comprehension_tools.js; node tests/test_popup.js; node tests/test_production_fixes.js; node tests/test_modern_youtube.js` (58/58 unit assertions passed)

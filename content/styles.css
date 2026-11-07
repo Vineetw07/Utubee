@@ -14,6 +14,27 @@ img[data-utubee-swapped="true"] {
   border-radius: inherit;
 }
 
+/*
+ * Zero-Flicker Scroll Shield:
+ * When the extension is active, images that are fetching milestone frames
+ * are masked to eliminate Flash of Original Thumbnail (FOOT) while scrolling.
+ * Live streams and 404 fallbacks are strictly bypassed.
+ */
+html[data-utubee-enabled="true"] img[data-utubee-loading="true"] {
+  opacity: 0 !important;
+}
+
+html[data-utubee-enabled="true"] img[data-utubee-swapped="true"]:not([data-utubee-loading="true"]) {
+  opacity: 1 !important;
+}
+
+html[data-utubee-enabled="true"] [data-utubee-live="true"] img,
+html[data-utubee-enabled="true"] [overlay-style="LIVE"] img,
+html[data-utubee-enabled="true"] [overlay-style="UPCOMING"] img,
+html[data-utubee-enabled="true"] img[data-utubee-failed="true"] {
+  opacity: 1 !important;
+}
+
 /* Ensure parent thumbnail containers maintain proper clipping */
 [data-utubee-card-active="true"] ytd-thumbnail,
 [data-utubee-card-active="true"] yt-image,
