@@ -540,7 +540,7 @@ function createMockDocument() {
     assert.strictEqual(preventedSlash, true);
     assert.strictEqual(engine._looperState.isLooping, false);
 
-    // Re-activate and test 'Escape'
+    // Re-activate and test 'Escape' (Must NOT preventDefault, to allow browser to exit fullscreen)
     engine._looperState.loopPointA = 10;
     engine._looperState.loopPointB = 20;
     engine._looperState.isLooping = true;
@@ -555,7 +555,7 @@ function createMockDocument() {
       preventDefault: () => { preventedEsc = true; }
     }, mockDoc);
 
-    assert.strictEqual(preventedEsc, true);
+    assert.strictEqual(preventedEsc, false, 'Escape key must not call preventDefault so native fullscreen exit works');
     assert.strictEqual(engine._looperState.isLooping, false);
   });
 

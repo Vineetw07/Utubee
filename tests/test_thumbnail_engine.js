@@ -189,28 +189,41 @@ test('CARD_SELECTORS excludes ytd-rich-grid-media to prevent double scanning', (
 });
 
 test('processCard early-exits when card is already at target milestone and skips avatars', () => {
-  let queriedSelector = '';
+  let swappedCalled = false;
   const cardAttributes = {
+    'data-utubee-video-id': 'testVid1234',
     'data-utubee-milestone': 'hq2'
+  };
+
+  const mockImg = {
+    src: 'https://i.ytimg.com/vi/testVid1234/hq2.jpg',
+    attributes: { 'data-utubee-swapped': 'true' },
+    getAttribute: (k) => mockImg.attributes[k] || null,
+    setAttribute: (k, v) => { mockImg.attributes[k] = String(v); },
+    hasAttribute: (k) => k in mockImg.attributes,
+    removeAttribute: (k) => { delete mockImg.attributes[k]; }
   };
 
   const mockCard = {
     getAttribute: (k) => cardAttributes[k] || null,
     setAttribute: (k, v) => { cardAttributes[k] = String(v); },
     querySelector: (sel) => {
-      queriedSelector = sel;
+      if (sel.includes('img')) return mockImg;
+      if (sel.includes('a#thumbnail') || sel.includes('/watch?v=')) return { getAttribute: () => '/watch?v=testVid1234' };
       return null;
     },
     querySelectorAll: () => []
   };
 
-  // Calling processCard with 'hq2' should early-exit without querying image
+  // Calling processCard with 'hq2' when already swapped to hq2 should early-exit without re-swapping
+  const originalSrc = mockImg.src;
   engine.processCard(mockCard, 'hq2');
-  assert.strictEqual(queriedSelector, '');
+  assert.strictEqual(mockImg.src, originalSrc);
 
-  // Calling with 'hq3' should execute selector query restricted to thumbnail containers
+  // Calling with 'hq3' should execute swap to hq3
   engine.processCard(mockCard, 'hq3');
-  assert.strictEqual(queriedSelector, 'ytd-thumbnail img, yt-image img, #thumbnail img');
+  assert.strictEqual(mockImg.src, 'https://i.ytimg.com/vi/testVid1234/hq3.jpg');
+  assert.strictEqual(cardAttributes['data-utubee-milestone'], 'hq3');
 });
 
 console.log(`\nAll ${testsPassed} unit assertions passed successfully!`);

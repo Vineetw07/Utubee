@@ -19,6 +19,18 @@
 ---
 
 ## Done
+- [x] TASK-108: Modern YouTube Card Selectors (`yt-lockup-view-model`, `yt-thumbnail-view-model`), Trusted Types CSP Fix, & Clean Slate Study HUD
+  - Completed: 2026-11-06T13:10:00Z
+  - Proof: Exit code 0 | `node --check content/content.js; node --check popup/popup.js; node tests/test_thumbnail_engine.js; node tests/test_study_shields.js; node tests/test_comprehension_tools.js; node tests/test_popup.js; node tests/test_production_fixes.js; node tests/test_modern_youtube.js` (58/58 unit assertions passed)
+  - CSP Compliance: Eliminated all `innerHTML` assignments, replacing with `document.createElementNS` and `.textContent` to comply with YouTube's `require-trusted-types-for 'script'` policy.
+  - HUD UX: Injected centered Clean Slate Focus HUD card on homepage feed void with zero distraction guidance.
+  - Files: `content/content.js`, `content/styles.css`, `tests/test_modern_youtube.js`
+- [x] TASK-107: Apply 4 Critical Production Fixes & Launch External Chrome Extension
+  - Completed: 2026-11-06T12:51:00Z
+  - Proof: Exit code 0 | `node tests/test_thumbnail_engine.js; node tests/test_study_shields.js; node tests/test_comprehension_tools.js; node tests/test_popup.js; node tests/test_production_fixes.js` (54/54 unit assertions passed)
+  - Repro Suite: `tests/test_production_fixes.js` captured RED failure on node recycling, GREEN on surgical patch
+  - External Browser: Launched standalone Google Chrome with `--load-extension="D:\TP\Utubee-Thumbnail"`
+  - Files: `content/content.js`, `tests/test_production_fixes.js`, `tests/test_comprehension_tools.js`, `tests/test_thumbnail_engine.js`
 - [x] TASK-105: End-to-End Verification, Syntax Checking & Chrome Packaging
   - Completed: 2026-11-06T12:33:00Z
   - Proof: Exit code 0 | `node --check content/content.js; node --check popup/popup.js; node tests/test_thumbnail_engine.js; node tests/test_study_shields.js; node tests/test_comprehension_tools.js; node tests/test_popup.js` (50/50 unit assertions passed)
@@ -64,3 +76,4 @@
 5. Zero FOUC Invariant: Hide distraction elements via declarative CSS at document_start, never periodic JS intervals.
 6. SPA Lifecycle Invariant: Clear A-B loop state and update observers on 'yt-navigate-finish' events.
 7. Concurrency Invariant: Sub-agents must never edit SPEC.md or TODO.md; only Lead Orchestrator updates state ledgers.
+8. Trusted Types Invariant: Never use .innerHTML on YouTube DOM due to CSP TrustedHTML enforcement; use createElement/NS only.

@@ -22,6 +22,7 @@
 
   const CARD_SELECTORS = [
     'ytd-rich-item-renderer',
+    'yt-lockup-view-model',
     'ytd-video-renderer',
     'ytd-compact-video-renderer',
     'ytd-grid-video-renderer',
@@ -205,13 +206,39 @@
       }
     }
 
-    // Clear srcset to prevent browser from overriding our milestone frame
+    // Clear srcset and lock property against YouTube lazy-load overrides
     img.removeAttribute('srcset');
     img.srcset = '';
+    try {
+      Object.defineProperty(img, 'srcset', {
+        get: () => '',
+        set: () => {},
+        configurable: true
+      });
+    } catch (_) {
+      // Graceful fallback for non-configurable mock or sealed objects
+    }
+
+    // Set loading state if not already loaded in browser memory cache
+    const isAlreadyLoaded = Boolean(img.complete && (img.naturalWidth === undefined || img.naturalWidth > 0));
+    if (!isAlreadyLoaded) {
+      img.setAttribute('data-utubee-loading', 'true');
+    } else {
+      img.removeAttribute('data-utubee-loading');
+    }
+
+    img.onload = () => {
+      img.removeAttribute('data-utubee-loading');
+    };
 
     // Graceful error fallback: restore original thumbnail if milestone frame returns 404
     img.onerror = () => {
       img.onerror = null;
+      img.onload = null;
+      img.removeAttribute('data-utubee-loading');
+      try {
+        delete img.srcset;
+      } catch (_) {}
       const originalSrc = img.getAttribute('data-utubee-orig-src');
       const originalSrcset = img.getAttribute('data-utubee-orig-srcset');
       if (originalSrc) {
@@ -239,27 +266,49 @@
   function processCard(card, milestone) {
     if (!card || typeof card.querySelector !== 'function') return;
 
-    if (card.getAttribute && card.getAttribute('data-utubee-milestone') === milestone) return;
-
     // Skip active live streams and upcoming premieres
     if (isLiveOrUpcoming(card)) {
       return;
     }
 
-    // Locate video card thumbnail image
-    const img = card.querySelector('ytd-thumbnail img, yt-image img, #thumbnail img');
+    // Locate video card thumbnail image (supports legacy ytd-thumbnail and modern yt-thumbnail-view-model)
+    const img = card.querySelector(
+      'yt-thumbnail-view-model img:not(.ytSpecAvatarShapeImage), ytd-thumbnail img, yt-image img, #thumbnail img, a[href*="/watch"] img:not(.ytSpecAvatarShapeImage)'
+    );
     if (!img) return;
 
-    // Locate primary anchor
-    const anchor = card.querySelector('a#thumbnail[href], a#video-title-link[href], a#video-title[href], a[href*="/watch?v="]');
+    // If this image already failed to load (404), do not retry in infinite loop
+    if (img.getAttribute && img.getAttribute('data-utubee-failed') === 'true') {
+      return;
+    }
+
+    // Locate primary anchor (supports legacy anchor IDs and modern ytLockupViewModelContentImage)
+    const anchor = card.querySelector(
+      'a.ytLockupViewModelContentImage[href], a#thumbnail[href], a#video-title-link[href], a#video-title[href], a[href*="/watch?v="]'
+    );
     const anchorHref = anchor ? anchor.getAttribute('href') : null;
     const currentSrc = img.currentSrc || img.getAttribute('src') || img.src || '';
 
     const videoId = extractVideoId(anchorHref, currentSrc);
     if (!videoId) return;
 
+    const targetUrl = getThumbnailUrl(videoId, milestone);
+    const existingVideoId = card.getAttribute ? card.getAttribute('data-utubee-video-id') : null;
+    const existingMilestone = card.getAttribute ? card.getAttribute('data-utubee-milestone') : null;
+
+    // Early exit only if both card and image are already confirmed swapped to the target video & milestone
+    if (
+      existingVideoId === videoId &&
+      existingMilestone === milestone &&
+      img.getAttribute && img.getAttribute('data-utubee-swapped') === 'true' &&
+      img.src === targetUrl
+    ) {
+      return;
+    }
+
     swapThumbnailImage(img, videoId, milestone);
     if (typeof card.setAttribute === 'function') {
+      card.setAttribute('data-utubee-video-id', videoId);
       card.setAttribute('data-utubee-milestone', milestone);
       card.setAttribute('data-utubee-card-active', 'true');
     }
@@ -281,10 +330,15 @@
    * Restores all swapped thumbnails back to original creator images.
    */
   function restoreAllThumbnails() {
-    const swappedImages = document.querySelectorAll('img[data-utubee-swapped="true"]');
+    const swappedImages = document.querySelectorAll('img[data-utubee-swapped="true"], img[data-utubee-loading="true"]');
     for (let i = 0; i < swappedImages.length; i++) {
       const img = swappedImages[i];
       img.onerror = null;
+      img.onload = null;
+      img.removeAttribute('data-utubee-loading');
+      try {
+        delete img.srcset;
+      } catch (_) {}
       const origSrc = img.getAttribute('data-utubee-orig-src');
       const origSrcset = img.getAttribute('data-utubee-orig-srcset');
 
@@ -302,6 +356,7 @@
     for (let i = 0; i < activeCards.length; i++) {
       activeCards[i].removeAttribute('data-utubee-card-active');
       activeCards[i].removeAttribute('data-utubee-milestone');
+      activeCards[i].removeAttribute('data-utubee-video-id');
     }
   }
 
@@ -325,11 +380,35 @@
    * @param {HTMLElement|null} btn
    */
   function updateCommentsToggleButton(isRevealed, btn = (typeof document !== 'undefined' ? document.getElementById('utubee-comments-toggle-btn') : null)) {
-    if (!btn) return;
+    if (!btn || typeof btn.setAttribute !== 'function') return;
     btn.setAttribute('aria-expanded', isRevealed ? 'true' : 'false');
-    btn.innerHTML = isRevealed
-      ? `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><span>Hide Comments &amp; Errata</span>`
-      : `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18zM18 14H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg><span>Show Errata &amp; Pinned Comments</span>`;
+
+    // Trusted Types CSP compliant DOM updates (zero innerHTML)
+    if (typeof btn.removeChild === 'function') {
+      while (btn.firstChild) {
+        btn.removeChild(btn.firstChild);
+      }
+    }
+
+    if (typeof document !== 'undefined' && typeof document.createElementNS === 'function') {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('aria-hidden', 'true');
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute(
+        'd',
+        isRevealed
+          ? 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z'
+          : 'M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18zM18 14H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z'
+      );
+      svg.appendChild(path);
+
+      const span = document.createElement('span');
+      span.textContent = isRevealed ? 'Hide Comments & Errata' : 'Show Errata & Pinned Comments';
+
+      btn.appendChild(svg);
+      btn.appendChild(span);
+    }
   }
 
   /**
@@ -411,6 +490,78 @@
   }
 
   /**
+   * Injects the Clean Slate Study HUD in place of the hidden recommendation feed.
+   * Eliminates the confusing "empty black void" while keeping students distraction-free.
+   * @param {Document|null} doc
+   * @returns {HTMLElement|null}
+   */
+  function injectCleanSlateHUD(doc = (typeof document !== 'undefined' ? document : null), win = (typeof window !== 'undefined' ? window : null)) {
+    if (!doc || typeof doc.querySelector !== 'function') return null;
+
+    const isHomePage = win && win.location ? (win.location.pathname === '/' || win.location.pathname === '') : true;
+    if (!currentSettings.extensionEnabled || !currentSettings.cleanHome || !isHomePage) {
+      teardownCleanSlateHUD(doc);
+      return null;
+    }
+
+    const homeBrowse = doc.querySelector('ytd-browse[page-subtype="home"]') || doc.querySelector('ytd-page-manager') || doc.body;
+    if (!homeBrowse) return null;
+
+    let container = doc.getElementById('utubee-clean-slate-container');
+    if (!container) {
+      container = doc.createElement('div');
+      container.id = 'utubee-clean-slate-container';
+
+      const card = doc.createElement('div');
+      card.className = 'utubee-clean-slate-card';
+
+      const icon = doc.createElement('div');
+      icon.className = 'utubee-clean-slate-icon';
+      if (typeof doc.createElementNS === 'function') {
+        const svg = doc.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('aria-hidden', 'true');
+        const path = doc.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9v-2h2v2zm0-4H9V7h2v5zm4 4h-2v-6h2v6zm0-8h-2V7h2v1z');
+        svg.appendChild(path);
+        icon.appendChild(svg);
+      }
+
+      const title = doc.createElement('h2');
+      title.className = 'utubee-clean-slate-title';
+      title.textContent = 'Clean Slate Study Mode Active';
+
+      const subtitle = doc.createElement('p');
+      subtitle.className = 'utubee-clean-slate-subtitle';
+      subtitle.textContent = 'Algorithmic recommendations hidden to protect your focus. Use the search bar above to study intentionally.';
+
+      card.appendChild(icon);
+      card.appendChild(title);
+      card.appendChild(subtitle);
+      container.appendChild(card);
+
+      if (typeof homeBrowse.insertBefore === 'function') {
+        homeBrowse.insertBefore(container, homeBrowse.firstChild);
+      } else if (typeof homeBrowse.appendChild === 'function') {
+        homeBrowse.appendChild(container);
+      }
+    }
+    return container;
+  }
+
+  /**
+   * Removes the Clean Slate Study HUD from the DOM.
+   * @param {Document|null} doc
+   */
+  function teardownCleanSlateHUD(doc = (typeof document !== 'undefined' ? document : null)) {
+    if (!doc || typeof doc.getElementById !== 'function') return;
+    const container = doc.getElementById('utubee-clean-slate-container');
+    if (container && container.parentNode && typeof container.parentNode.removeChild === 'function') {
+      container.parentNode.removeChild(container);
+    }
+  }
+
+  /**
    * Resets the comments revealed state on client-side SPA navigation.
    * @param {HTMLElement|null} root
    */
@@ -430,6 +581,7 @@
     clearLoop(false);
     resetCommentsRevealedState();
     injectCommentsToggleButton();
+    injectCleanSlateHUD();
     scheduleScan();
   }
 
@@ -446,9 +598,11 @@
         applyRootAttributes(currentSettings);
         if (currentSettings.extensionEnabled) {
           injectCommentsToggleButton();
+          injectCleanSlateHUD();
           scheduleScan();
         } else {
           teardownCommentsToggleButton();
+          teardownCleanSlateHUD();
         }
       });
 
@@ -459,7 +613,7 @@
 
         for (const key of Object.keys(changes)) {
           if (key in currentSettings) {
-            currentSettings[key] = changes[key].newValue;
+            currentSettings[key] = changes[key].newValue !== undefined ? changes[key].newValue : DEFAULT_SETTINGS[key];
           }
         }
 
@@ -469,10 +623,20 @@
           if (!currentSettings.extensionEnabled) {
             restoreAllThumbnails();
             teardownCommentsToggleButton();
+            teardownCleanSlateHUD();
             clearLoop(false);
           } else {
             injectCommentsToggleButton();
+            injectCleanSlateHUD();
             shouldReScan = true;
+          }
+        }
+
+        if (changes.cleanHome) {
+          if (currentSettings.cleanHome && currentSettings.extensionEnabled) {
+            injectCleanSlateHUD();
+          } else {
+            teardownCleanSlateHUD();
           }
         }
 
@@ -516,6 +680,9 @@
       if (currentSettings.hideComments && isWatchPage && typeof document !== 'undefined' && !document.getElementById('utubee-errata-container')) {
         injectCommentsToggleButton();
       }
+      if (currentSettings.cleanHome && typeof document !== 'undefined' && !document.getElementById('utubee-clean-slate-container')) {
+        injectCleanSlateHUD();
+      }
     });
 
     const root = document.documentElement || document.body;
@@ -556,7 +723,9 @@
    */
   function getActiveVideo(doc = (typeof document !== 'undefined' ? document : null)) {
     if (!doc || typeof doc.querySelector !== 'function') return null;
-    return doc.querySelector('.html5-video-player video, #movie_player video, ytd-player video, video');
+    return doc.querySelector(
+      '#movie_player video.html5-main-video, ytd-player video.html5-main-video, .html5-video-player video.html5-main-video, .html5-video-player video, video'
+    );
   }
 
   let toastTimeout = null;
@@ -768,6 +937,14 @@
     if (!looperState.isLooping || looperState.loopPointA === null || looperState.loopPointB === null) return;
     if (!video) return;
 
+    // Safety guard: Suppress loop seeking while YouTube commercial ads are playing
+    if (
+      (video.closest && video.closest('.ad-showing, .ad-interrupting')) ||
+      (typeof document !== 'undefined' && document.querySelector && document.querySelector('.ad-showing, .ad-interrupting'))
+    ) {
+      return;
+    }
+
     if (video.currentTime >= looperState.loopPointB || video.currentTime < looperState.loopPointA - 0.5) {
       video.currentTime = looperState.loopPointA;
     }
@@ -892,14 +1069,17 @@
   function handleKeyDown(e, doc = (typeof document !== 'undefined' ? document : null)) {
     if (!e) return;
 
+    // Resolve true origin element across Shadow DOM boundary (YouTube Polymer / Web Components)
+    const target = (e.composedPath && typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
+
     // Critical safety guard: ignore typing in form inputs, textareas, contenteditable, or searchbox
     if (
-      e.target &&
-      (e.target.isContentEditable ||
-        (typeof e.target.matches === 'function' &&
-          e.target.matches('input, textarea, [contenteditable="true"], ytd-searchbox, ytd-searchbox *')) ||
-        (typeof e.target.closest === 'function' &&
-          e.target.closest('input, textarea, [contenteditable="true"], ytd-searchbox')))
+      target &&
+      (target.isContentEditable ||
+        (typeof target.matches === 'function' &&
+          target.matches('input, textarea, [contenteditable="true"], ytd-searchbox, ytd-searchbox *')) ||
+        (typeof target.closest === 'function' &&
+          target.closest('input, textarea, [contenteditable="true"], ytd-searchbox, ytd-commentbox, tp-yt-paper-input')))
     ) {
       return;
     }
@@ -935,7 +1115,10 @@
     // Clear Active Loop: '\' or 'Escape'
     if (!e.altKey && !e.ctrlKey && !e.metaKey && (e.key === '\\' || e.code === 'Backslash' || e.key === 'Escape')) {
       if (looperState.isLooping || looperState.loopPointA !== null || looperState.loopPointB !== null) {
-        if (typeof e.preventDefault === 'function') e.preventDefault();
+        // Never call preventDefault on Escape to preserve native fullscreen exit
+        if (e.key !== 'Escape' && typeof e.preventDefault === 'function') {
+          e.preventDefault();
+        }
         clearLoop(true, doc);
       }
       return;
@@ -957,14 +1140,16 @@
       handleKeyDown(e, document);
     });
 
-    // Initial scan and button injection when DOM is interactive
+    // Initial scan, button injection, and clean slate HUD when DOM is interactive
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => {
         injectCommentsToggleButton();
+        injectCleanSlateHUD();
         scheduleScan();
       }, { once: true });
     } else {
       injectCommentsToggleButton();
+      injectCleanSlateHUD();
       scheduleScan();
     }
   }
@@ -993,6 +1178,8 @@
       teardownCommentsToggleButton,
       resetCommentsRevealedState,
       updateCommentsToggleButton,
+      injectCleanSlateHUD,
+      teardownCleanSlateHUD,
       formatTimestamp,
       getActiveVideo,
       showToast,
